@@ -5,10 +5,14 @@ let connection;
 try {
   if (process.env.DATABASE_URL) {
     // Production (Railway) configuration
+    const config = new URL(process.env.DATABASE_URL);
     connection = mysql.createConnection({
-      uri: process.env.DATABASE_URL,
+      host: config.hostname,
+      user: config.username,
+      password: config.password,
+      database: config.pathname.substr(1),
+      port: config.port,
       ssl: {
-        minVersion: 'TLSv1.2',
         rejectUnauthorized: false
       }
     });
