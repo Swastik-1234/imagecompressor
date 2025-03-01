@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { 
   Button, 
   Box, 
@@ -10,21 +10,25 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  Paper
+  Paper,
+  TextField,
+  Alert
 } from '@mui/material';
 import axios from 'axios';
 
-const API_BASE_URL = 'http://localhost:3001'; // Updated port
-
 const FileUpload = () => {
-    const [compressionStats, setCompressionStats] = useState({});
-
+  const [compressionStats, setCompressionStats] = useState({});
   const [file, setFile] = useState(null);
   const [requestId, setRequestId] = useState(null);
   const [status, setStatus] = useState(null);
   const [results, setResults] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [webhookUrl, setWebhookUrl] = useState('');
+  const [webhookStatus, setWebhookStatus] = useState(null);
+  const [webhookTriggered, setWebhookTriggered] = useState(false);
+
+  const API_BASE_URL = 'http://localhost:3001';
 
   const formatFileSize = (bytes) => {
     if (!bytes) return 'Calculating...';
@@ -39,6 +43,7 @@ const FileUpload = () => {
   const handleFileChange = (event) => {
     setFile(event.target.files[0]);
     setError(null);
+    setWebhookTriggered(false);
   };
 
   const handleUpload = async () => {
@@ -49,9 +54,14 @@ const FileUpload = () => {
 
     setLoading(true);
     setError(null);
+    setWebhookStatus(webhookUrl ? 'Webhook configured - waiting for processing' : null);
+    setWebhookTriggered(false);
 
     const formData = new FormData();
     formData.append('file', file);
+    if (webhookUrl) {
+      formData.append('webhookUrl', webhookUrl);
+    }
 
     try {
       const response = await axios.post(`${API_BASE_URL}/api/upload`, formData);
@@ -69,13 +79,14 @@ const FileUpload = () => {
       setStatus(response.data.status);
 
       if (response.data.status === 'completed') {
+        setWebhookTriggered(true);
+        setWebhookStatus('Processing complete! Check webhook.site for results');
         getResults(id);
+      } else if (response.data.status === 'processing') {
+        setTimeout(() => checkStatus(id), 2000);
       } else if (response.data.status === 'failed') {
         setError('Processing failed');
         setLoading(false);
-      } else {
-        // Check again in 2 seconds
-        setTimeout(() => checkStatus(id), 2000);
       }
     } catch (err) {
       setError('Status check failed: ' + err.message);
@@ -86,41 +97,11 @@ const FileUpload = () => {
   const getResults = async (id) => {
     try {
       const response = await axios.get(`${API_BASE_URL}/api/results/${id}`);
-      console.log('Results received:', response.data); // Debug log
-      setResults(response.data.products);
+      setResults(response.data);
       setLoading(false);
     } catch (err) {
       setError('Failed to fetch results: ' + err.message);
       setLoading(false);
-    }
-  };
-
-  const processImages = async (requestId, products) => {
-    try {
-      // ... existing code ...
-
-      const outputUrls = inputUrls.map(url => {
-        // Create a new URL object
-        const urlObj = new URL(url);
-        // Add 'processed-' prefix to the hostname
-        return url.replace(urlObj.hostname, 'processed-' + urlObj.hostname);
-      });
-
-      // ... rest of the code ...
-    } catch (error) {
-      console.error('Error processing images:', error);
-      throw error;
-    }
-  };
-
-  const getProcessedImageUrl = (inputUrl) => {
-    try {
-      const urlObj = new URL(inputUrl);
-      // Add 'processed-' prefix to the hostname
-      return inputUrl.replace(urlObj.hostname, 'processed-' + urlObj.hostname);
-    } catch (error) {
-      console.error('Error processing URL:', error);
-      return inputUrl;
     }
   };
 
@@ -150,6 +131,15 @@ const FileUpload = () => {
         )}
       </Box>
 
+      <TextField
+        label="Webhook URL (optional)"
+        value={webhookUrl}
+        onChange={(e) => setWebhookUrl(e.target.value)}
+        fullWidth
+        margin="normal"
+        helperText="Enter webhook.site URL to receive processing notifications"
+      />
+
       <Button
         variant="contained"
         color="primary"
@@ -170,13 +160,22 @@ const FileUpload = () => {
       )}
 
       {error && (
-        <Typography color="error" sx={{ mb: 2 }}>
+        <Alert severity="error" sx={{ mb: 2 }}>
           {error}
-        </Typography>
+        </Alert>
       )}
-  
-  {results && (
-        <TableContainer component={Paper}>
+
+      {webhookUrl && webhookStatus && (
+        <Alert 
+          severity={webhookTriggered ? "success" : "info"} 
+          sx={{ mb: 2 }}
+        >
+          {webhookStatus}
+        </Alert>
+      )}
+
+      {results && (
+        <TableContainer component={Paper} sx={{ mt: 3 }}>
           <Table>
             <TableHead>
               <TableRow>
@@ -184,75 +183,59 @@ const FileUpload = () => {
                 <TableCell>Product Name</TableCell>
                 <TableCell>Original Image</TableCell>
                 <TableCell>Compressed Image</TableCell>
+                <TableCell>Original Size</TableCell>
+                <TableCell>Compressed Size</TableCell>
+                <TableCell>Compression Ratio</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
-              {results.map((product) => (
-                <TableRow key={product['Sl No']}>
+              {results.products.map((product, index) => (
+                <TableRow key={index}>
                   <TableCell>{product['Sl No']}</TableCell>
                   <TableCell>{product['Product Name']}</TableCell>
                   <TableCell>
-                    {product['Input Image Urls'].map((url, i) => (
-                      <Box key={i} sx={{ mb: 2 }}>
-                        <Typography variant="subtitle2">Original Image {i + 1}</Typography>
+                    {product['Input Image Urls'] && product['Input Image Urls'].map((url, i) => (
+                      <Box key={i} sx={{ mb: 1 }}>
                         <img 
                           src={url} 
-                          alt={`Original ${i + 1}`}
-                          style={{ 
-                            maxWidth: '200px', 
-                            maxHeight: '200px',
-                            border: '1px solid #ddd',
-                            borderRadius: '4px',
-                            padding: '4px'
-                          }}
+                          alt={`Original ${i+1}`} 
+                          style={{ maxWidth: '100px', height: 'auto' }}
                         />
-                        <Typography variant="caption" color="textSecondary">
-                          Size: {formatFileSize(product.originalSizes?.[i])}
-                        </Typography>
                       </Box>
                     ))}
                   </TableCell>
                   <TableCell>
                     {product['Output Image Urls'] && product['Output Image Urls'].map((url, i) => (
-                      <Box key={i} sx={{ mb: 2 }}>
-                        <Typography variant="subtitle2">
-                          Compressed Image {i + 1}
-                        </Typography>
+                      <Box key={i} sx={{ mb: 1 }}>
                         <img 
                           src={url} 
-                          alt={`Compressed ${i + 1}`}
-                          style={{ 
-                            maxWidth: '200px', 
-                            maxHeight: '200px',
-                            border: '1px solid #ddd',
-                            borderRadius: '4px',
-                            padding: '4px'
-                          }}
+                          alt={`Compressed ${i+1}`} 
+                          style={{ maxWidth: '100px', height: 'auto' }}
                         />
-                        <Box sx={{ mt: 1 }}>
-                          <Typography variant="caption" color="textSecondary" display="block">
-                            Original Size: {formatFileSize(product.originalSizes?.[i])}
-                          </Typography>
-                          <Typography variant="caption" color="textSecondary" display="block">
-                            Compressed Size: {formatFileSize(product.compressedSizes?.[i])}
-                          </Typography>
-                          <Typography 
-                            variant="caption" 
-                            sx={{ 
-                              color: 'success.main',
-                              fontWeight: 'bold',
-                              display: 'block',
-                              mt: 0.5
-                            }}
-                          >
-                            {product.compressionRatios?.[i] 
-                              ? `Reduced by ${product.compressionRatios[i]}%` 
-                              : 'Calculating compression ratio...'}
-                          </Typography>
-                        </Box>
                       </Box>
                     ))}
-                     </TableCell>
+                  </TableCell>
+                  <TableCell>
+                    {product.originalSizes && product.originalSizes.map((size, i) => (
+                      <Box key={i} sx={{ mb: 1 }}>
+                        {formatFileSize(size)}
+                      </Box>
+                    ))}
+                  </TableCell>
+                  <TableCell>
+                    {product.compressedSizes && product.compressedSizes.map((size, i) => (
+                      <Box key={i} sx={{ mb: 1 }}>
+                        {formatFileSize(size)}
+                      </Box>
+                    ))}
+                  </TableCell>
+                  <TableCell>
+                    {product.compressionRatios && product.compressionRatios.map((ratio, i) => (
+                      <Box key={i} sx={{ mb: 1 }}>
+                        {ratio}%
+                      </Box>
+                    ))}
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>

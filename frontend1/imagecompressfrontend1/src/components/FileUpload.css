@@ -1,0 +1,30 @@
+.upload-container {
+  padding: 20px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.webhook-section {
+  margin: 15px 0;
+}
+
+.webhook-input {
+  width: 100%;
+  padding: 8px;
+  margin-bottom: 10px;
+}
+
+.webhook-status {
+  color: #2196F3;
+  font-size: 14px;
+  margin-top: 5px;
+}
+
+.webhook-info {
+  background-color: #E3F2FD;
+  padding: 10px;
+  border-radius: 4px;
+  margin: 10px 0;
+}
+
+/* ... rest of your existing styles ... */ 

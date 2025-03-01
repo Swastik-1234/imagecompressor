@@ -1,55 +1,136 @@
-const pool = require('../config/database');
 const ImageCompressor = require('../utils/imageCompressor');
+const connection = require('../config/database');
 const WebhookService = require('./webhookService');
 
 class ImageProcessor {
-  static async processRequest(requestId) {
+  static async processImages(requestId, products) {
     try {
+      console.log('Starting image processing for request:', requestId);
+
       // Update status to processing
-      await pool.execute(
-        'UPDATE processing_requests SET status = ? WHERE id = ?',
-        ['processing', requestId]
-      );
+      await new Promise((resolve, reject) => {
+        connection.query(
+          'UPDATE processing_requests SET status = ? WHERE id = ?',
+          ['processing', requestId],
+          (err) => {
+            if (err) reject(err);
+            else resolve();
+          }
+        );
+      });
 
-      // Get all products for this request
-      const [products] = await pool.execute(
-        'SELECT * FROM products WHERE request_id = ?',
-        [requestId]
-      );
-
+      // Process each product
       for (const product of products) {
-        const inputUrls = product.input_image_urls.split(',');
-        const outputUrls = [];
-
-        // Process each image
-        for (const url of inputUrls) {
-          const compressedUrl = await ImageCompressor.compressImage(url.trim());
-          outputUrls.push(compressedUrl);
+        if (!product || !product['Input image Urls']) {
+          console.error('Invalid product data:', product);
+          continue;
         }
 
-        // Update product with processed images
-        await pool.execute(
-          'UPDATE products SET output_image_urls = ? WHERE id = ?',
-          [outputUrls.join(','), product.id]
-        );
+        const inputUrls = product['Input image Urls'].split(',').map(url => url.trim());
+        const results = [];
+        const originalSizes = [];
+        const compressedSizes = [];
+        const compressionRatios = [];
+
+        // Process each image URL
+        for (const url of inputUrls) {
+          try {
+            console.log('Processing URL:', url);
+            const result = await ImageCompressor.compressImage(url);
+            results.push(result.url);
+            originalSizes.push(result.originalSize);
+            compressedSizes.push(result.compressedSize);
+            compressionRatios.push(result.compressionRatio);
+          } catch (error) {
+            console.error('Error processing image:', url, error);
+          }
+        }
+
+        // Update product with results
+        await new Promise((resolve, reject) => {
+          connection.query(
+            `UPDATE products SET 
+              output_image_urls = ?,
+              original_sizes = ?,
+              compressed_sizes = ?,
+              compression_ratios = ?
+            WHERE request_id = ? AND serial_number = ?`,
+            [
+              results.join(','),
+              JSON.stringify(originalSizes),
+              JSON.stringify(compressedSizes),
+              JSON.stringify(compressionRatios),
+              requestId,
+              product['Sl No']
+            ],
+            (err) => {
+              if (err) {
+                console.error('Database update error:', err);
+                reject(err);
+              } else resolve();
+            }
+          );
+        });
       }
 
       // Update status to completed
-      await pool.execute(
-        'UPDATE processing_requests SET status = ? WHERE id = ?',
-        ['completed', requestId]
-      );
+      await new Promise((resolve, reject) => {
+        connection.query(
+          'UPDATE processing_requests SET status = ? WHERE id = ?',
+          ['completed', requestId],
+          (err) => {
+            if (err) reject(err);
+            else resolve();
+          }
+        );
+      });
 
-      // Trigger webhook
-      await WebhookService.notify(requestId);
+      // Get all processed results
+      const [processedResults] = await new Promise((resolve, reject) => {
+        connection.query(
+          `SELECT * FROM products WHERE request_id = ?`,
+          [requestId],
+          (err, results) => {
+            if (err) reject(err);
+            else resolve([results]);
+          }
+        );
+      });
+
+      // Trigger webhook with complete results
+      await WebhookService.trigger(requestId, {
+        status: 'completed',
+        processedAt: new Date(),
+        results: processedResults
+      });
+
+      console.log('Processing completed and webhook triggered for request:', requestId);
+
     } catch (error) {
-      console.error('Processing error:', error);
-      await pool.execute(
-        'UPDATE processing_requests SET status = ? WHERE id = ?',
-        ['failed', requestId]
-      );
+      console.error('Error processing images:', error);
+      
+      // Update status to failed
+      await new Promise((resolve, reject) => {
+        connection.query(
+          'UPDATE processing_requests SET status = ? WHERE id = ?',
+          ['failed', requestId],
+          (err) => {
+            if (err) reject(err);
+            else resolve();
+          }
+        );
+      });
+
+      // Trigger webhook with error status
+      await WebhookService.trigger(requestId, {
+        status: 'failed',
+        error: error.message,
+        processedAt: new Date()
+      });
+
+      throw error;
     }
   }
 }
 
-module.exports = ImageProcessor; 
+module.exports = ImageProcessor;
