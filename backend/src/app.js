@@ -10,10 +10,10 @@ const uploadController = require('./controllers/uploadController');
 const statusController = require('./controllers/statusController');
 
 const app = express();
-const PORT = process.env.PORT || 3002;
+const PORT = process.env.PORT || 3001;
 app.use('/compressed', express.static(path.join(__dirname, '../public/compressed')));
 
-// CORS configuration
+// Enable CORS
 app.use(cors({
   origin: '*',
   methods: ['GET', 'POST'],
@@ -55,6 +55,11 @@ app.post('/api/upload', upload.single('file'), uploadController.uploadCSV);
 app.get('/api/status/:requestId', statusController.getStatus);
 app.get('/api/results/:requestId', statusController.getResults);
 
+// Basic route for testing
+app.get('/', (req, res) => {
+  res.json({ message: 'Server is running' });
+});
+
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error(err.stack);
@@ -62,18 +67,8 @@ app.use((err, req, res, next) => {
 });
 
 // Start server
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);
-}).on('error', (err) => {
-  if (err.code === 'EADDRINUSE') {
-    const newPort = PORT + 1;
-    console.log(`Port ${PORT} is busy, trying port ${newPort}`);
-    app.listen(newPort, () => {
-      console.log(`Server now running on port ${newPort}`);
-    });
-  } else {
-    console.error('Server error:', err);
-  }
 });
 
 module.exports = app;
