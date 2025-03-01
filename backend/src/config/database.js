@@ -5,13 +5,18 @@ let connection;
 try {
   if (process.env.DATABASE_URL) {
     // Production (Railway) configuration
-    const connectionConfig = {
-      uri: process.env.DATABASE_URL,
+    const connectionString = process.env.DATABASE_URL;
+    const config = {
+      host: connectionString.split('@')[1].split(':')[0],
+      user: connectionString.split('://')[1].split(':')[0],
+      password: connectionString.split(':')[2].split('@')[0],
+      database: connectionString.split('/').pop(),
+      port: parseInt(connectionString.split(':').pop()),
       ssl: {
         rejectUnauthorized: false
       }
     };
-    connection = mysql.createConnection(connectionConfig);
+    connection = mysql.createConnection(config);
   } else {
     // Local development configuration
     connection = mysql.createConnection({
