@@ -1,0 +1,41 @@
+services:
+  - type: web
+    name: image-processor-backend
+    env: node
+    buildCommand: cd backend && npm install
+    startCommand: cd backend && node src/app.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3001
+      - key: DB_HOST
+        fromDatabase:
+          name: image-processor-db
+          property: host
+      - key: DB_NAME
+        fromDatabase:
+          name: image-processor-db
+          property: database
+      - key: DB_USER
+        fromDatabase:
+          name: image-processor-db
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: image-processor-db
+          property: password
+
+  - type: web
+    name: image-processor-frontend
+    env: node
+    buildCommand: cd frontend1/imagecompressfrontend1 && npm install && npm run build
+    startCommand: cd frontend1/imagecompressfrontend1 && npm run preview
+    envVars:
+      - key: VITE_API_BASE_URL
+        value: https://image-processor-backend.onrender.com
+
+databases:
+  - name: image-processor-db
+    databaseName: image_processor
+    user: image_processor 
