@@ -5,13 +5,19 @@ let connection;
 try {
   if (process.env.DATABASE_URL) {
     // Production (Railway) configuration
-    connection = mysql.createConnection(process.env.DATABASE_URL + "&ssl={'rejectUnauthorized':false}");
+    const connectionConfig = {
+      uri: process.env.DATABASE_URL,
+      ssl: {
+        rejectUnauthorized: false
+      }
+    };
+    connection = mysql.createConnection(connectionConfig);
   } else {
     // Local development configuration
     connection = mysql.createConnection({
       host: 'localhost',
       user: 'root',
-      password: 'ySwastik@010',
+      password: 'Swastik@010',
       database: 'image_processing_system',
       port: 3306
     });
