@@ -1,7 +1,7 @@
 const express = require('express');
 const multer = require('multer');
 const cors = require('cors');
-const mysql = require('mysql');
+const mysql2 = require('mysql2');
 const csv = require('csv-parse');
 require('dotenv').config();
 const path = require('path');
@@ -35,19 +35,39 @@ const upload = multer({
 });
 
 // Database configuration
-const connection = mysql.createConnection({
-  host: process.env.DB_HOST || 'localhost',
-  user: process.env.DB_USER || 'root',
-  password: process.env.DB_PASSWORD || 'ySwastik@010',
-  database: process.env.DB_NAME || 'image_processing_system'
-});
+let connection;
 
-connection.connect((err) => {
+if (process.env.DATABASE_URL) {
+  // Production (Railway) configuration
+  connection = mysql2.createConnection(process.env.DATABASE_URL + "?ssl=true");
+} else {
+  // Local development configuration
+  connection = mysql2.createConnection({
+    host: 'localhost',
+    user: 'root',
+    password: 'Swastik@010',
+    database: 'image_processing_system',
+    port: 3306
+  });
+}
+
+// Handle connection errors
+connection.connect(err => {
   if (err) {
     console.error('Error connecting to database:', err);
     return;
   }
-  console.log('Connected to MySQL database');
+  console.log('Successfully connected to database');
+});
+
+// Handle disconnects
+connection.on('error', function(err) {
+  console.error('Database error:', err);
+  if (err.code === 'PROTOCOL_CONNECTION_LOST') {
+    connection.connect();
+  } else {
+    throw err;
+  }
 });
 
 // Routes

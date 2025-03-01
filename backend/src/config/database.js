@@ -1,36 +1,43 @@
 const mysql = require('mysql2');
 
-const connection = mysql.createConnection({
-  host: process.env.DB_HOST,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME || 'railway',
-  port: process.env.DB_PORT || 3306,
-  ssl: {
-    rejectUnauthorized: false
-  },
-  authPlugins: {
-    mysql_clear_password: () => () => Buffer.from(process.env.DB_PASSWORD + '\0')
-  }
-});
+let connection;
 
-// Handle connection errors
-connection.connect(err => {
-  if (err) {
-    console.error('Error connecting to database:', err);
-    return;
-  }
-  console.log('Successfully connected to database');
-});
-
-// Handle disconnects
-connection.on('error', function(err) {
-  console.error('Database error:', err);
-  if (err.code === 'PROTOCOL_CONNECTION_LOST') {
-    connection.connect();
+try {
+  if (process.env.DATABASE_URL) {
+    // Production (Railway) configuration
+    connection = mysql.createConnection(process.env.DATABASE_URL + "?ssl=true");
   } else {
-    throw err;
+    // Local development configuration
+    connection = mysql.createConnection({
+      host: 'localhost',
+      user: 'root',
+      password: 'Swastik@010',
+      database: 'image_processing_system',
+      port: 3306
+    });
   }
-});
+
+  // Handle connection errors
+  connection.connect(err => {
+    if (err) {
+      console.error('Error connecting to database:', err);
+      return;
+    }
+    console.log('Successfully connected to database');
+  });
+
+  // Handle disconnects
+  connection.on('error', function(err) {
+    console.error('Database error:', err);
+    if (err.code === 'PROTOCOL_CONNECTION_LOST') {
+      connection.connect();
+    } else {
+      throw err;
+    }
+  });
+
+} catch (error) {
+  console.error('Database configuration error:', error);
+}
 
 module.exports = connection;
