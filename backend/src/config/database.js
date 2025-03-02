@@ -5,14 +5,7 @@ let connection;
 try {
   if (process.env.DATABASE_URL) {
     // Production (Railway) configuration
-    const config = new URL(process.env.DATABASE_URL);
-    connection = mysql.createConnection({
-      host: config.hostname,
-      user: config.username,
-      password: config.password,
-      database: config.pathname.substr(1),
-      port: config.port
-    });
+    connection = mysql.createConnection(process.env.DATABASE_URL);
   } else {
     // Local development configuration
     connection = mysql.createConnection({
