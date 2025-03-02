@@ -11,28 +11,25 @@ try {
     port: process.env.DB_PORT
   });
 
-  // Create connection with explicit configuration
-  connection = mysql.createConnection({
+  // Create connection pool instead of single connection
+  connection = mysql.createPool({
+    connectionLimit: 10,
     host: process.env.DB_HOST,
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
     database: process.env.DB_NAME || 'railway',
     port: parseInt(process.env.DB_PORT) || 3306,
-    insecureAuth: true,
-    authPlugins: {
-      mysql_native_password: () => ({
-        password: process.env.DB_PASSWORD
-      })
-    }
+    insecureAuth: true
   });
 
-  // Handle connection
-  connection.connect(err => {
+  // Test the connection
+  connection.getConnection((err, tempConnection) => {
     if (err) {
       console.error('Error connecting to database:', err);
       return;
     }
     console.log('Successfully connected to database');
+    tempConnection.release();
   });
 
 } catch (error) {
