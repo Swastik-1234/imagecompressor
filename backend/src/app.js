@@ -15,6 +15,15 @@ const PORT = process.env.PORT || 3001;
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(cors({
+  origin: [
+    'https://frontend-imagecompression1-git-main-swastiks-projects-4c1663a0.vercel.app',
+    'http://localhost:3000'  // Keep this for local development
+  ],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true
+}));
 
 // Serve static files
 app.use('/compressed', express.static(path.join(__dirname, '../public/compressed')));
