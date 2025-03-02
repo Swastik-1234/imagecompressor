@@ -3,61 +3,58 @@ const mysql = require('mysql2');
 let connection;
 
 try {
-  // Log environment variables for debugging
+  // Get environment
+  const isProduction = process.env.NODE_ENV === 'production';
+
+  // Set configuration based on environment
   const dbConfig = {
-    host: process.env.DB_HOST || 'localhost',
-    user: process.env.DB_USER || 'root',
-    database: process.env.DB_NAME || 'railway',
-    port: parseInt(process.env.DB_PORT) || 3306
+    host: isProduction ? process.env.DB_HOST : 'localhost',
+    user: isProduction ? process.env.DB_USER : 'root',
+    password: isProduction ? process.env.DB_PASSWORD : 'Swastik@010',
+    database: isProduction ? process.env.DB_NAME : 'image_processing_system',
+    port: parseInt(process.env.DB_PORT) || 3306,
+    ssl: isProduction ? {
+      rejectUnauthorized: false
+    } : false
   };
 
-  console.log('Full Database Config:', {
+  console.log('Database Config:', {
     ...dbConfig,
     password: '****' // Hide password in logs
   });
 
-  if (!process.env.DB_HOST || !process.env.DB_USER || !process.env.DB_PASSWORD) {
-    console.error('Missing required database environment variables');
-  }
-
   // Create connection pool
   const pool = mysql.createPool({
     ...dbConfig,
-    password: process.env.DB_PASSWORD,
     waitForConnections: true,
     connectionLimit: 10,
     maxIdle: 10,
     idleTimeout: 60000,
-    queueLimit: 0,
-    enableKeepAlive: true,
-    keepAliveInitialDelay: 0
+    queueLimit: 0
   });
 
   connection = pool.promise();
 
-  // Test the connection immediately
+  // Test the connection
   pool.getConnection((err, tempConnection) => {
     if (err) {
       console.error('Database connection error:', {
         code: err.code,
         message: err.message,
         stack: err.stack,
-        host: process.env.DB_HOST,
-        port: process.env.DB_PORT
+        host: dbConfig.host,
+        user: dbConfig.user,
+        database: dbConfig.database
       });
-      throw err; // Make the error more visible
+      throw err;
     }
     console.log('Successfully connected to database');
     tempConnection.release();
   });
 
 } catch (error) {
-  console.error('Database configuration error:', {
-    message: error.message,
-    stack: error.stack,
-    code: error.code
-  });
-  throw error; // Re-throw to make startup fail if DB connection fails
+  console.error('Database configuration error:', error);
+  throw error;
 }
 
 module.exports = connection;
