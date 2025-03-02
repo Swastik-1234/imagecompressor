@@ -4,20 +4,26 @@ let connection;
 
 try {
   // Log environment variables for debugging
-  console.log('Attempting database connection with:', {
-    host: process.env.DB_HOST,
-    user: process.env.DB_USER,
-    database: process.env.DB_NAME,
-    port: process.env.DB_PORT
+  const dbConfig = {
+    host: process.env.DB_HOST || 'localhost',
+    user: process.env.DB_USER || 'root',
+    database: process.env.DB_NAME || 'railway',
+    port: parseInt(process.env.DB_PORT) || 3306
+  };
+
+  console.log('Full Database Config:', {
+    ...dbConfig,
+    password: '****' // Hide password in logs
   });
+
+  if (!process.env.DB_HOST || !process.env.DB_USER || !process.env.DB_PASSWORD) {
+    console.error('Missing required database environment variables');
+  }
 
   // Create connection pool
   const pool = mysql.createPool({
-    host: process.env.DB_HOST || 'localhost',
-    user: process.env.DB_USER || 'root',
+    ...dbConfig,
     password: process.env.DB_PASSWORD,
-    database: process.env.DB_NAME || 'railway',
-    port: parseInt(process.env.DB_PORT) || 3306,
     waitForConnections: true,
     connectionLimit: 10,
     maxIdle: 10,
@@ -29,23 +35,29 @@ try {
 
   connection = pool.promise();
 
-  // Test the connection
+  // Test the connection immediately
   pool.getConnection((err, tempConnection) => {
     if (err) {
       console.error('Database connection error:', {
         code: err.code,
         message: err.message,
+        stack: err.stack,
         host: process.env.DB_HOST,
         port: process.env.DB_PORT
       });
-      return;
+      throw err; // Make the error more visible
     }
     console.log('Successfully connected to database');
     tempConnection.release();
   });
 
 } catch (error) {
-  console.error('Database configuration error:', error);
+  console.error('Database configuration error:', {
+    message: error.message,
+    stack: error.stack,
+    code: error.code
+  });
+  throw error; // Re-throw to make startup fail if DB connection fails
 }
 
 module.exports = connection;

@@ -6,89 +6,105 @@ const csv = require('csv-parse');
 require('dotenv').config();
 const path = require('path');
 const ImageCompressor = require('./utils/imageCompressor');
-const uploadController = require('./controllers/uploadController');
-const statusController = require('./controllers/statusController');
-//
+const upload = require('./config/multer');
+
 const app = express();
 const PORT = process.env.PORT || 3001;
+
+// Middleware
+app.use(cors());
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Serve static files
 app.use('/compressed', express.static(path.join(__dirname, '../public/compressed')));
 
-// Enable CORS
-app.use(cors({
-  origin: '*',
-  methods: ['GET', 'POST'],
-  credentials: true
-}));
+// Database connection
+const connection = require('./config/database');
 
-app.use(express.json());
-
-// Configure multer for file upload
-const upload = multer({
-  storage: multer.memoryStorage(),
-  fileFilter: (req, file, cb) => {
-    if (file.mimetype === 'text/csv') {
-      cb(null, true);
-    } else {
-      cb(new Error('Only CSV files are allowed'));
-    }
-  }
-});
-
-// Database configuration
-let connection;
-
-if (process.env.DATABASE_URL) {
-  // Production (Railway) configuration
-  connection = mysql.createConnection(process.env.DATABASE_URL + "?ssl=true");
-} else {
-  // Local development configuration
-  connection = mysql.createConnection({
-    host: 'localhost',
-    user: 'root',
-    password: 'Swastik@010',
-    database: 'image_processing_system',
-    port: 3306
-  });
-}
-
-// Handle connection errors
-connection.connect(err => {
-  if (err) {
-    console.error('Error connecting to database:', err);
-    return;
-  }
-  console.log('Successfully connected to database');
-});
-
-// Handle disconnects
-connection.on('error', function(err) {
-  console.error('Database error:', err);
-  if (err.code === 'PROTOCOL_CONNECTION_LOST') {
-    connection.connect();
-  } else {
-    throw err;
-  }
+// Health check endpoint
+app.get('/', (req, res) => {
+  res.json({ status: 'Server is running' });
 });
 
 // Routes
-app.post('/api/upload', upload.single('file'), uploadController.uploadCSV);
-app.get('/api/status/:requestId', statusController.getStatus);
-app.get('/api/results/:requestId', statusController.getResults);
+app.post('/api/upload', upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
 
-// Basic route for testing
-app.get('/', (req, res) => {
-  res.json({ message: 'Server is running' });
+    // Process the CSV file
+    const results = [];
+    const parser = csv.parse({ columns: true });
+
+    parser.on('readable', () => {
+      let record;
+      while ((record = parser.read())) {
+        results.push(record);
+      }
+    });
+
+    parser.on('error', (err) => {
+      console.error('CSV parsing error:', err);
+      res.status(400).json({ error: 'Error parsing CSV file' });
+    });
+
+    parser.on('end', () => {
+      res.json({ message: 'File uploaded successfully', data: results });
+    });
+
+    parser.write(req.file.buffer);
+    parser.end();
+
+  } catch (error) {
+    console.error('Upload error:', error);
+    res.status(500).json({ error: 'Error processing upload' });
+  }
+});
+
+app.get('/api/status/:requestId', async (req, res) => {
+  try {
+    const { requestId } = req.params;
+    const [rows] = await connection.query(
+      'SELECT status FROM requests WHERE id = ?',
+      [requestId]
+    );
+    
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Request not found' });
+    }
+    
+    res.json({ status: rows[0].status });
+  } catch (error) {
+    console.error('Status check error:', error);
+    res.status(500).json({ error: 'Error checking status' });
+  }
 });
 
 // Error handling middleware
 app.use((err, req, res, next) => {
-  console.error(err.stack);
+  console.error('Error:', err);
   res.status(500).json({ error: err.message || 'Something went wrong!' });
 });
 
-// Start server
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server running on port ${PORT}`);
-});
+// Start server only if database connection is successful
+const startServer = async () => {
+  try {
+    // Test database connection
+    await connection.query('SELECT 1');
+    console.log('Database connection successful');
+
+    // Start the server
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`Server running on port ${PORT}`);
+    });
+  } catch (error) {
+    console.error('Failed to start server:', error);
+    process.exit(1);
+  }
+};
+
+startServer();
 
 module.exports = app;
