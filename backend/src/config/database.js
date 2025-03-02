@@ -11,10 +11,7 @@ try {
       user: config.username,
       password: config.password,
       database: config.pathname.substr(1),
-      port: config.port,
-      ssl: {
-        rejectUnauthorized: false
-      }
+      port: config.port
     });
   } else {
     // Local development configuration
