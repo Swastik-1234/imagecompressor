@@ -3,37 +3,30 @@ const mysql = require('mysql');
 let connection;
 
 try {
-  if (process.env.DATABASE_URL) {
-    // Production (Railway) configuration
-    connection = mysql.createConnection(process.env.DATABASE_URL);
-  } else {
-    // Local development configuration
-    connection = mysql.createConnection({
-      host: 'localhost',
-      user: 'root',
-      password: 'Swastik@010',
-      database: 'image_processing_system',
-      port: 3306
-    });
-  }
+  // Log the environment variables (for debugging)
+  console.log('Environment:', {
+    NODE_ENV: process.env.NODE_ENV,
+    DB_HOST: process.env.DB_HOST,
+    DB_USER: process.env.DB_USER,
+    DB_NAME: process.env.DB_NAME,
+    DB_PORT: process.env.DB_PORT
+  });
 
-  // Handle connection errors
+  // Always use environment variables in production
+  connection = mysql.createConnection({
+    host: process.env.DB_HOST || 'localhost',
+    user: process.env.DB_USER || 'root',
+    password: process.env.DB_PASSWORD || 'Swastik@010',
+    database: process.env.DB_NAME || 'image_processing_system',
+    port: process.env.DB_PORT || 3306
+  });
+
   connection.connect(err => {
     if (err) {
       console.error('Error connecting to database:', err);
       return;
     }
     console.log('Successfully connected to database');
-  });
-
-  // Handle disconnects
-  connection.on('error', function(err) {
-    console.error('Database error:', err);
-    if (err.code === 'PROTOCOL_CONNECTION_LOST') {
-      connection.connect();
-    } else {
-      throw err;
-    }
   });
 
 } catch (error) {
