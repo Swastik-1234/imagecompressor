@@ -8,7 +8,7 @@ const path = require('path');
 const ImageCompressor = require('./utils/imageCompressor');
 const uploadController = require('./controllers/uploadController');
 const statusController = require('./controllers/statusController');
-
+//
 const app = express();
 const PORT = process.env.PORT || 3001;
 app.use('/compressed', express.static(path.join(__dirname, '../public/compressed')));
