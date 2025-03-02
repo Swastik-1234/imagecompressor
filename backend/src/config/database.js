@@ -1,4 +1,4 @@
-const mysql = require('mysql');
+const mysql = require('mysql2');
 
 let connection;
 
@@ -11,15 +11,14 @@ try {
     port: process.env.DB_PORT
   });
 
-  // Create connection pool instead of single connection
+  // Create connection pool
   connection = mysql.createPool({
     connectionLimit: 10,
     host: process.env.DB_HOST,
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
     database: process.env.DB_NAME || 'railway',
-    port: parseInt(process.env.DB_PORT) || 3306,
-    insecureAuth: true
+    port: parseInt(process.env.DB_PORT) || 3306
   });
 
   // Test the connection
