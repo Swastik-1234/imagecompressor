@@ -1,7 +1,7 @@
 const express = require('express');
 const multer = require('multer');
 const cors = require('cors');
-const mysql2 = require('mysql2');
+const mysql = require('mysql');
 const csv = require('csv-parse');
 require('dotenv').config();
 const path = require('path');
@@ -39,10 +39,10 @@ let connection;
 
 if (process.env.DATABASE_URL) {
   // Production (Railway) configuration
-  connection = mysql2.createConnection(process.env.DATABASE_URL + "?ssl=true");
+  connection = mysql.createConnection(process.env.DATABASE_URL + "?ssl=true");
 } else {
   // Local development configuration
-  connection = mysql2.createConnection({
+  connection = mysql.createConnection({
     host: 'localhost',
     user: 'root',
     password: 'Swastik@010',
