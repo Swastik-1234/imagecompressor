@@ -11,50 +11,40 @@ class ImageCompressor {
       // Download image
       const response = await axios({
         url,
-        responseType: 'arraybuffer'
+        responseType: 'arraybuffer',
+        timeout: 30000
       });
 
       // Get original size in KB
-      const originalSize = (response.data.length / 1024).toFixed(2);
-      console.log('Original size:', originalSize, 'KB');
+      const originalSize = response.data.length;
+      console.log('Original size:', originalSize);
 
       // Compress image
       const compressedBuffer = await sharp(response.data)
-        .jpeg({ quality: 80 })  // Adjust quality as needed (0-100)
+        .jpeg({ quality: 80 })
         .toBuffer();
 
-      // Get compressed size in KB
-      const compressedSize = (compressedBuffer.length / 1024).toFixed(2);
-      console.log('Compressed size:', compressedSize, 'KB');
+      // Get compressed size
+      const compressedSize = compressedBuffer.length;
+      console.log('Compressed size:', compressedSize);
 
       // Calculate compression ratio
-      const compressionRatio = (((response.data.length - compressedBuffer.length) / response.data.length) * 100).toFixed(2);
+      const compressionRatio = Math.round((1 - compressedSize / originalSize) * 100);
       console.log('Compression ratio:', compressionRatio, '%');
 
-      // Save compressed image
-      const filename = `${Date.now()}-${Math.random().toString(36).substring(7)}.jpg`;
-      const outputDir = path.join(__dirname, '../../public/compressed');
-      const outputPath = path.join(outputDir, filename);
+      // Convert to base64
+      const base64Data = `data:image/jpeg;base64,${compressedBuffer.toString('base64')}`;
 
-      // Create directory if it doesn't exist
-      if (!fs.existsSync(outputDir)) {
-        fs.mkdirSync(outputDir, { recursive: true });
-      }
-
-      // Save file
-      await fs.promises.writeFile(outputPath, compressedBuffer);
-
-      // Return results
       return {
-        url: `/compressed/${filename}`,
-        originalSize: parseFloat(originalSize),
-        compressedSize: parseFloat(compressedSize),
-        compressionRatio: parseFloat(compressionRatio)
+        url: base64Data,
+        originalSize,
+        compressedSize,
+        compressionRatio
       };
 
     } catch (error) {
       console.error('Error compressing image:', error);
-      throw new Error(`Failed to compress image: ${error.message}`);
+      throw error;
     }
   }
 }
